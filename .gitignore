@@ -1,0 +1,15 @@
+# Swift Package Manager
+.build/
+build/
+
+# Xcode / SwiftPM user state
+.swiftpm/xcode/xcuserdata/
+.swiftpm/xcode/package.xcworkspace/xcuserdata/
+*.xcuserstate
+xcuserdata/
+
+# macOS
+.DS_Store
+
+# Local notes and indexes (Obsidian-style index files)
+_index*.md
