@@ -11,7 +11,7 @@ actor Transcriber {
         if loadedModel == model, pipe != nil { return }
         pipe = nil
         loadedModel = nil
-        let config = WhisperKitConfig(model: model)
+        let config = WhisperKitConfig(model: model, downloadBase: Storage.modelsDirectory)
         pipe = try await WhisperKit(config)
         loadedModel = model
     }

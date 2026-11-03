@@ -58,6 +58,9 @@ enum FlowState: Equatable {
 struct HistoryItem: Identifiable {
     let id = UUID()
     let text: String
+    /// Process the text was typed into, or nil if it was only copied to the
+    /// clipboard. Undo is only sent while this app is frontmost.
+    let targetPID: pid_t?
     let date = Date()
     var preview: String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -79,7 +82,8 @@ enum SettingKey {
 
     static let defaultModel = "large-v3-v20240930_626MB"
     static let defaultRawApps = "com.apple.Terminal, com.googlecode.iterm2, com.microsoft.VSCode, com.apple.dt.Xcode, dev.zed.Zed"
-    static let defaultMemoFolder = "~/Documents/Voice Memos"
+    // In the home folder rather than ~/Documents, which iCloud Drive may sync.
+    static let defaultMemoFolder = "~/LocalFlow Memos"
     static let defaultMemoTopics = "Work, Personal, Ideas"
 }
 
@@ -103,6 +107,9 @@ final class AppController: ObservableObject {
 
     private var commandKeyDown = false
     private var frontAppAtStart: String?
+    // The app the user was in when they started speaking. Text is only typed
+    // if that app is still frontmost when it is ready.
+    private var targetPIDAtStart: pid_t?
     private var commandSelection: String?
     private var errorResetTask: Task<Void, Never>?
 
@@ -226,7 +233,9 @@ final class AppController: ObservableObject {
         guard whisperReady else { flashError(LFError.modelNotReady.localizedDescription); return }
         guard micGranted else { requestMicrophone(); return }
 
-        frontAppAtStart = NSWorkspace.shared.frontmostApplication?.bundleIdentifier?.lowercased()
+        let frontApp = NSWorkspace.shared.frontmostApplication
+        frontAppAtStart = frontApp?.bundleIdentifier?.lowercased()
+        targetPIDAtStart = frontApp?.processIdentifier
         do {
             try recorder.start()
             state = .recording
@@ -298,6 +307,7 @@ final class AppController: ObservableObject {
         guard micGranted else { requestMicrophone(); return }
 
         commandKeyDown = true
+        targetPIDAtStart = NSWorkspace.shared.frontmostApplication?.processIdentifier
         Task {
             // Capture the selected text in the frontmost app before recording.
             let selection = await injector.copySelectedText()
@@ -354,16 +364,43 @@ final class AppController: ObservableObject {
     // MARK: - Insertion, history, undo
 
     private func insert(_ text: String) {
+        let target = targetPIDAtStart
+        targetPIDAtStart = nil
+        commandSelection = nil
+
+        // If focus moved while we were transcribing, typing now would put the
+        // text into whatever app the user switched to. Copy it instead.
+        let frontPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        guard let target, frontPID == target else {
+            copyToClipboard(text)
+            addToHistory(HistoryItem(text: text, targetPID: nil))
+            flashError("Focus changed, so the text was copied to the clipboard instead")
+            return
+        }
+
         let method = defaults.string(forKey: SettingKey.injectionMethod) ?? "auto"
         injector.insert(text, preferAccessibility: method == "auto")
-        history.insert(HistoryItem(text: text), at: 0)
-        if history.count > 20 { history.removeLast() }
-        commandSelection = nil
+        addToHistory(HistoryItem(text: text, targetPID: target))
         state = .idle
     }
 
+    private func addToHistory(_ item: HistoryItem) {
+        history.insert(item, at: 0)
+        if history.count > 20 { history.removeLast() }
+    }
+
     func undoLastInsert() {
-        guard !history.isEmpty else { return }
+        guard let last = history.first else { return }
+        guard let target = last.targetPID else {
+            flashError("The last dictation was copied, not typed, so there is nothing to undo")
+            return
+        }
+        // Cmd+Z goes to the frontmost app; only send it to the app we typed into.
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target else {
+            let name = NSRunningApplication(processIdentifier: target)?.localizedName ?? "the app you dictated into"
+            flashError("Switch back to \(name) to undo")
+            return
+        }
         injector.sendUndoKeystroke()
         history.removeFirst()
     }

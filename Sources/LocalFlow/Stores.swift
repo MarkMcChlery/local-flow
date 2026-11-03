@@ -11,6 +11,12 @@ enum Storage {
         return dir
     }
 
+    /// Where WhisperKit downloads speech models. Kept out of ~/Documents
+    /// (WhisperKit's default) so iCloud Drive never syncs the ~630 MB model.
+    static var modelsDirectory: URL {
+        directory.appendingPathComponent("huggingface", isDirectory: true)
+    }
+
     static func load<T: Codable>(_ filename: String, fallback: T) -> T {
         let url = directory.appendingPathComponent(filename)
         guard let data = try? Data(contentsOf: url),

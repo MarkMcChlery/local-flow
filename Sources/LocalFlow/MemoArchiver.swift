@@ -25,7 +25,7 @@ enum MemoArchiver {
         }
     }
 
-    /// Resolves the configured memo folder (default: ~/Documents/Voice Memos;
+    /// Resolves the configured memo folder (default: ~/LocalFlow Memos;
     /// change it in Settings -> Memos).
     static var baseFolder: URL {
         let raw = UserDefaults.standard.string(forKey: SettingKey.memoFolder) ?? SettingKey.defaultMemoFolder

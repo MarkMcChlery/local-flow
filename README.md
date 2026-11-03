@@ -80,16 +80,28 @@ Dictating into Terminal, VS Code, Xcode or iTerm inserts the raw transcript with
 | `xcrun: error` or `no such module` during build | Full Xcode is not selected. Run `sudo xcode-select -s /Applications/Xcode.app`, then `sudo xcodebuild -license accept`, and rebuild. |
 | Build fails resolving packages                  | Needs internet for the first build only. Check connection and re-run `./build.sh --install`. |
 | Hotkey does nothing                             | Another app may own that shortcut. Change it in Settings -> Hotkeys. |
-| No text appears after speaking                  | Accessibility permission missing, or was invalidated by a rebuild. System Settings -> Privacy & Security -> Accessibility: remove LocalFlow (minus button), re-add it, or toggle it off and on. |
-| Text appears in the wrong app                   | The focused app changed while transcribing. Keep the target app focused until text lands. |
+| No text appears after speaking                  | Accessibility permission missing, or was invalidated by an ad-hoc rebuild. System Settings -> Privacy & Security -> Accessibility: remove LocalFlow (minus button), re-add it, or toggle it off and on. |
+| "Focus changed, so the text was copied"         | You switched apps while it was transcribing. Local Flow only types into the app you started in, so it copied the text to the clipboard instead: paste it with `Cmd+V`. |
 | "Apple Intelligence not available" in Settings  | Enable it in System Settings -> Apple Intelligence & Siri and wait for its download to finish. Dictation still works meanwhile with rule-based clean-up. |
 | Transcription is poor                           | Settings -> General -> try the Large v3 Turbo model (default) or check your mic input level in System Settings -> Sound. |
-| Rebuilt the app and permissions broke           | Expected: each ad-hoc build is a "new" app to macOS. Re-tick Accessibility (and mic if prompted). |
-| Want to start fresh                             | Delete `/Applications/LocalFlow.app`, `~/Library/Application Support/LocalFlow`, and the model cache at `~/Documents/huggingface`. Note: that cache sits under `~/Documents`, so if iCloud Drive syncs your Desktop & Documents, the ~630 MB model syncs to iCloud too. |
+| Rebuilt the app and permissions broke           | The build was ad-hoc signed, so macOS sees a "new" app. Re-tick Accessibility (and mic if prompted), then set up a signing certificate (see below) so it stops happening. |
+| Want to start fresh                             | Delete `/Applications/LocalFlow.app`, `~/Library/Application Support/LocalFlow`, (which includes the speech model cache). |
+
+## Keep permissions across rebuilds (recommended)
+
+macOS ties the Accessibility permission to the app's code signature. By default `build.sh` signs ad-hoc, which gives every build a new identity, so you have to re-tick Accessibility after each rebuild. Signing with the same certificate every time fixes this. You only need to do it once:
+
+1. Open **Keychain Access** and choose **Keychain Access -> Certificate Assistant -> Create a Certificate...**
+2. Name: `LocalFlow Dev`. Identity Type: **Self Signed Root**. Certificate Type: **Code Signing**. Click **Create**.
+3. Run `./build.sh --install` and grant Accessibility one last time.
+
+`build.sh` uses the certificate automatically when it finds it (use a different name with `LOCALFLOW_SIGN_IDENTITY="My Cert" ./build.sh`). The first time, macOS may ask to let `codesign` use the key: click **Always Allow**.
+
+**Upgrading from an older build:** the speech model now lives in `~/Library/Application Support/LocalFlow/huggingface` instead of `~/Documents/huggingface`, so it downloads once more. Afterwards you can delete the old copy at `~/Documents/huggingface/models/argmaxinc/whisperkit-coreml`. If you never changed the memo folder, new memos now go to `~/LocalFlow Memos`; older ones stay in `~/Documents/Voice Memos`.
 
 ## Privacy
 
-Zero network use after the one-time model downloads (Whisper model from Hugging Face; Apple Intelligence via macOS itself). No analytics, no account, no logs leaving the machine. Dictation history is kept in memory only and disappears when the app quits. Dictionary and snippets are stored as plain JSON in `~/Library/Application Support/LocalFlow/`. If you turn on voice memos (Settings -> Memos, off by default), each dictation is additionally saved as a Markdown file under your chosen folder (default: `~/Documents/Voice Memos`), still entirely on-device; nothing leaves the Mac.
+Zero network use after the one-time model downloads (Whisper model from Hugging Face; Apple Intelligence via macOS itself). No analytics, no account, no logs leaving the machine. Dictation history is kept in memory only and disappears when the app quits. Dictionary and snippets are stored as plain JSON in `~/Library/Application Support/LocalFlow/`. If you turn on voice memos (Settings -> Memos, off by default), each dictation is additionally saved as a Markdown file under your chosen folder (default: `~/LocalFlow Memos`), still entirely on-device; nothing leaves the Mac.
 
 ## Development
 
