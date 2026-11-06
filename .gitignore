@@ -13,3 +13,6 @@ xcuserdata/
 
 # Local notes and indexes (Obsidian-style index files)
 _index*.md
+
+# Codex worker scratch output
+.codex/

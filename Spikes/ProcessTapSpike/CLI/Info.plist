@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.markmcchlery.localflow.tapspike</string>
+<key>CFBundleName</key><string>ProcessTapSpike</string>
+<key>NSAudioCaptureUsageDescription</key><string>Record selected app or system audio locally to test meeting capture.</string>
+</dict></plist>
