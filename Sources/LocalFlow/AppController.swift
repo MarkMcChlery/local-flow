@@ -251,6 +251,7 @@ final class AppController: ObservableObject {
         let samples = recorder.stop()
         // Ignore accidental taps shorter than ~0.3 seconds of audio.
         guard samples.count > 4800 else { state = .idle; return }
+        guard !rejectSilence(samples) else { return }
 
         state = .transcribing
         Task {
@@ -340,6 +341,10 @@ final class AppController: ObservableObject {
             state = .idle
             return
         }
+        guard !rejectSilence(samples) else {
+            commandSelection = nil
+            return
+        }
 
         state = .transcribing
         Task {
@@ -411,6 +416,20 @@ final class AppController: ObservableObject {
     }
 
     // MARK: - Helpers
+
+    /// Logs the recording's levels and, if the input was effectively dead,
+    /// tells the user instead of transcribing. Whisper turns silence into
+    /// phantom text such as "Thank you.", which would otherwise be typed
+    /// and archived as a memo.
+    private func rejectSilence(_ samples: [Float]) -> Bool {
+        let stats = recorder.lastStats
+        stats?.appendToLog()
+        guard AudioLevel.isSilent(samples) else { return false }
+        targetPIDAtStart = nil
+        let device = stats?.device ?? "the microphone"
+        flashError("No sound picked up from \(device). Check the input in System Settings -> Sound")
+        return true
+    }
 
     private func flashError(_ message: String) {
         state = .error(message)

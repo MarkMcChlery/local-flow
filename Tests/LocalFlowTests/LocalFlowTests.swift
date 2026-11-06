@@ -126,3 +126,31 @@ final class SnippetStoreTests: XCTestCase {
         XCTAssertNil(SnippetStore.expansion(for: "anything", in: withEmpty))
     }
 }
+
+// MARK: - Audio level / silence detection
+
+final class AudioLevelTests: XCTestCase {
+
+    func testDigitalSilenceIsSilent() {
+        XCTAssertTrue(AudioLevel.isSilent([Float](repeating: 0, count: 16_000)))
+    }
+
+    func testEmptyInputIsSilent() {
+        XCTAssertTrue(AudioLevel.isSilent([]))
+        XCTAssertEqual(AudioLevel.rms([]), 0)
+    }
+
+    func testRoomNoiseIsNotSilent() {
+        // Ambient level measured from a real mic: peak ~0.04.
+        let noise = (0..<16_000).map { i in Float(sin(Double(i) * 0.3)) * 0.04 }
+        XCTAssertFalse(AudioLevel.isSilent(noise))
+    }
+
+    func testPeakUsesAbsoluteValue() {
+        XCTAssertEqual(AudioLevel.peak([0.1, -0.5, 0.2]), 0.5)
+    }
+
+    func testRMSOfConstantSignal() {
+        XCTAssertEqual(AudioLevel.rms([Float](repeating: 0.5, count: 100)), 0.5, accuracy: 1e-6)
+    }
+}
